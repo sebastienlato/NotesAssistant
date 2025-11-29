@@ -2,6 +2,8 @@ import SwiftUI
 
 struct LectureDetailView: View {
     @StateObject private var viewModel: LectureDetailViewModel
+    @State private var shareItems: [Any] = []
+    @State private var showingShareSheet = false
 
     init(viewModel: LectureDetailViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
@@ -18,6 +20,7 @@ struct LectureDetailView: View {
                 playbackButtons
 
                 transcriptSection
+                exportSection
 
                 if let error = viewModel.errorMessage {
                     Text(error)
@@ -29,6 +32,9 @@ struct LectureDetailView: View {
         }
         .navigationTitle("Lecture Detail")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingShareSheet) {
+            ShareSheet(activityItems: shareItems)
+        }
     }
 
     private var titleField: some View {
@@ -79,6 +85,56 @@ struct LectureDetailView: View {
             )
         }
     }
+
+    private var exportSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Export")
+                .font(.headline)
+
+            Button {
+                if let items = viewModel.transcriptShareItems() {
+                    shareItems = items
+                    showingShareSheet = true
+                }
+            } label: {
+                Label("Share transcript…", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!viewModel.canShareTranscript)
+
+            Button {
+                if let items = viewModel.audioShareItems() {
+                    shareItems = items
+                    showingShareSheet = true
+                }
+            } label: {
+                Label("Share audio…", systemImage: "music.note.list")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(!viewModel.canShareAudio)
+
+            Button {
+                Task {
+                    if let url = await viewModel.pdfShareURL() {
+                        shareItems = [url]
+                        showingShareSheet = true
+                    }
+                }
+            } label: {
+                if viewModel.isExportingPDF {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                } else {
+                    Label("Export as PDF", systemImage: "doc.richtext")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .buttonStyle(.bordered)
+            .disabled(viewModel.isExportingPDF)
+        }
+    }
 }
 
 #Preview {
@@ -95,6 +151,7 @@ struct LectureDetailView: View {
             viewModel: LectureDetailViewModel(
                 note: sampleNote,
                 transcriptionService: transcription,
+                pdfExporter: PDFExporter(),
                 persistNote: { _ in }
             )
         )

@@ -8,20 +8,23 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
     @Published var transcriptText: String
     @Published var isPlaying = false
     @Published var isTranscribing = false
+    @Published var isExportingPDF = false
     @Published var errorMessage: String?
 
     private(set) var note: LectureNote
 
     private let transcriptionService: Transcribing
     private let persistNote: @Sendable (LectureNote) async -> Void
+    private let pdfExporter: PDFExporting
     private let documentsDirectory: URL
     private var audioPlayer: AVAudioPlayer?
     private var autosaveTask: Task<Void, Never>?
 
-    init(note: LectureNote, transcriptionService: Transcribing, persistNote: @escaping @Sendable (LectureNote) async -> Void) {
+    init(note: LectureNote, transcriptionService: Transcribing, pdfExporter: PDFExporting, persistNote: @escaping @Sendable (LectureNote) async -> Void) {
         self.note = note
         self.transcriptionService = transcriptionService
         self.persistNote = persistNote
+        self.pdfExporter = pdfExporter
         self.documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         self.titleText = note.title
         self.transcriptText = note.transcriptText ?? ""
@@ -41,6 +44,14 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
         documentsDirectory.appendingPathComponent(note.audioFilePath)
     }
 
+    var canShareTranscript: Bool {
+        !transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var canShareAudio: Bool {
+        FileManager.default.fileExists(atPath: audioURL.path)
+    }
+
     func updateTitle(_ text: String) {
         titleText = text
         note.title = text
@@ -51,6 +62,45 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
         transcriptText = text
         note.transcriptText = text.isEmpty ? nil : text
         scheduleAutosave()
+    }
+
+    func transcriptShareItems() -> [Any]? {
+        let text = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            errorMessage = "Transcript is empty."
+            return nil
+        }
+        let titleLine = titleText.isEmpty ? note.title : titleText
+        let exportText = "\(titleLine)\n\n\(text)"
+        return [exportText]
+    }
+
+    func audioShareItems() -> [Any]? {
+        let url = audioURL
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            errorMessage = "Audio file is missing."
+            return nil
+        }
+        return [url]
+    }
+
+    func pdfShareURL() async -> URL? {
+        let text = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            errorMessage = "Transcript is empty."
+            return nil
+        }
+        isExportingPDF = true
+        defer { isExportingPDF = false }
+
+        let titleLine = titleText.isEmpty ? note.title : titleText
+        do {
+            let url = try pdfExporter.exportPDF(title: titleLine, date: note.date, transcript: text)
+            return url
+        } catch {
+            errorMessage = "Failed to create PDF: \(error.localizedDescription)"
+            return nil
+        }
     }
 
     func transcribe() {

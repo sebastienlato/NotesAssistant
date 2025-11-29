@@ -70,6 +70,7 @@ struct LectureListView: View {
                         viewModel: LectureDetailViewModel(
                             note: note,
                             transcriptionService: transcriptionService,
+                            pdfExporter: PDFExporter(),
                             persistNote: { updated in
                                 await viewModel.persist(note: updated)
                             }
