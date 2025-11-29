@@ -6,6 +6,8 @@ final class LectureListViewModel: ObservableObject {
     @Published private(set) var notes: [LectureNote] = []
     @Published var errorMessage: String?
     @Published var isLoading = false
+    @Published var searchText: String = ""
+    @Published var showOnlyWithTranscript = false
 
     nonisolated private let lectureStore: any LectureStore
     private let documentsDirectory: URL
@@ -26,7 +28,7 @@ final class LectureListViewModel: ObservableObject {
             notes = loaded.sorted(by: { $0.date > $1.date })
             errorMessage = nil
         } catch {
-            errorMessage = "Failed to load notes: \(error.localizedDescription)"
+            errorMessage = "Could not load notes. Please try again."
             notes = []
         }
         isLoading = false
@@ -47,6 +49,24 @@ final class LectureListViewModel: ObservableObject {
         return note
     }
 
+    func deleteNotes(at offsets: IndexSet) async {
+        let targets = offsets.compactMap { index -> LectureNote? in
+            guard index < filteredNotes.count else { return nil }
+            return filteredNotes[index]
+        }
+
+        for note in targets {
+            removeAudioFile(for: note)
+            notes.removeAll { $0.id == note.id }
+        }
+
+        do {
+            try await persistNotes()
+        } catch {
+            errorMessage = "Could not delete note. Please try again."
+        }
+    }
+
     func applyUpdated(note: LectureNote) {
         if let index = notes.firstIndex(where: { $0.id == note.id }) {
             notes[index] = note
@@ -61,8 +81,20 @@ final class LectureListViewModel: ObservableObject {
         do {
             try await persistNotes()
         } catch {
-            errorMessage = "Failed to save notes: \(error.localizedDescription)"
+            errorMessage = "Could not save your changes. Please try again."
         }
+    }
+
+    var filteredNotes: [LectureNote] {
+        var filtered = notes
+        if !searchText.trimmingCharacters(in: .whitespaces).isEmpty {
+            let query = searchText.lowercased()
+            filtered = filtered.filter { $0.title.lowercased().contains(query) }
+        }
+        if showOnlyWithTranscript {
+            filtered = filtered.filter { ($0.transcriptText ?? "").isEmpty == false }
+        }
+        return filtered
     }
 
     // MARK: - Helpers
@@ -106,6 +138,11 @@ final class LectureListViewModel: ObservableObject {
             return trimmed.isEmpty ? url.lastPathComponent : String(trimmed)
         }
         return url.lastPathComponent
+    }
+
+    private func removeAudioFile(for note: LectureNote) {
+        let url = documentsDirectory.appendingPathComponent(note.audioFilePath)
+        try? FileManager.default.removeItem(at: url)
     }
 
     private static func makeDateFormatter() -> DateFormatter {

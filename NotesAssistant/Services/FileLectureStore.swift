@@ -10,9 +10,8 @@ final class FileLectureStore: LectureStore, @unchecked Sendable {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
-    init(filename: String = "lectures.json") {
-        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        self.fileURL = documents.appendingPathComponent(filename)
+    init(filename: String = "lectures.json", baseURL: URL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!) {
+        self.fileURL = baseURL.appendingPathComponent(filename)
 
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

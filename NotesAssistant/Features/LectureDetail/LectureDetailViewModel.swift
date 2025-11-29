@@ -108,7 +108,7 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
             let url = try pdfExporter.exportPDF(title: titleLine, date: note.date, transcript: text)
             return url
         } catch {
-            errorMessage = "Failed to create PDF: \(error.localizedDescription)"
+            errorMessage = "Could not create PDF. Please try again."
             return nil
         }
     }
@@ -133,7 +133,7 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
                 }
             } catch {
                 await MainActor.run {
-                    self.summaryErrorMessage = error.localizedDescription
+                    self.summaryErrorMessage = "Could not generate a summary right now. Please try again."
                     self.isSummarizing = false
                 }
             }
@@ -153,10 +153,11 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
                 await MainActor.run {
                     self.note.transcriptText = transcript.fullText
                     self.transcriptText = transcript.fullText
+                    self.summaryResult = nil
                 }
                 await self.persistCurrentNote()
             } catch {
-                await MainActor.run { self.errorMessage = error.localizedDescription }
+                await MainActor.run { self.errorMessage = "Could not transcribe recording. Please try again." }
             }
             await MainActor.run { self.isTranscribing = false }
         }

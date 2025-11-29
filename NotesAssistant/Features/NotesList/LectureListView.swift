@@ -9,13 +9,15 @@ struct LectureListView: View {
     @StateObject private var viewModel: LectureListViewModel
     private let audioRecorder: AudioRecording
     private let transcriptionService: Transcribing
+    private let summaryService: any Summarizing
 
     @State private var path: [LectureRoute] = []
 
-    init(viewModel: LectureListViewModel, audioRecorder: AudioRecording, transcriptionService: Transcribing) {
+    init(viewModel: LectureListViewModel, audioRecorder: AudioRecording, transcriptionService: Transcribing, summaryService: any Summarizing) {
         _viewModel = StateObject(wrappedValue: viewModel)
         self.audioRecorder = audioRecorder
         self.transcriptionService = transcriptionService
+        self.summaryService = summaryService
     }
 
     var body: some View {
@@ -23,15 +25,10 @@ struct LectureListView: View {
             Group {
                 if viewModel.notes.isEmpty {
                     emptyState
+                } else if viewModel.filteredNotes.isEmpty {
+                    noResultsState
                 } else {
-                    List {
-                        ForEach(viewModel.notes) { note in
-                            NavigationLink(value: LectureRoute.detail(note)) {
-                                LectureRow(note: note)
-                            }
-                        }
-                    }
-                    .listStyle(.plain)
+                    listContent
                 }
             }
             .navigationTitle("Lecture Notes")
@@ -70,7 +67,7 @@ struct LectureListView: View {
                         viewModel: LectureDetailViewModel(
                             note: note,
                             transcriptionService: transcriptionService,
-                            summaryService: HeuristicSummaryService(),
+                            summaryService: summaryService,
                             pdfExporter: PDFExporter(),
                             persistNote: { updated in
                                 await viewModel.persist(note: updated)
@@ -80,6 +77,7 @@ struct LectureListView: View {
                 }
             }
         }
+        .searchable(text: $viewModel.searchText, prompt: "Search titles")
     }
 
     private var emptyState: some View {
@@ -97,12 +95,47 @@ struct LectureListView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    private var noResultsState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "text.magnifyingglass")
+                .font(.system(size: 40))
+                .foregroundStyle(.secondary)
+            Text("No results")
+                .font(.headline)
+            Text("Try a different title or clear filters.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var listContent: some View {
+        List {
+            if !viewModel.notes.isEmpty {
+                Toggle(isOn: $viewModel.showOnlyWithTranscript) {
+                    Text("Only notes with transcript")
+                }
+            }
+
+            ForEach(viewModel.filteredNotes) { note in
+                NavigationLink(value: LectureRoute.detail(note)) {
+                    LectureRow(note: note)
+                        .accessibilityLabel("Lecture titled \(note.title), recorded on \(LectureRow.dateFormatter.string(from: note.date))")
+                }
+            }
+            .onDelete { offsets in
+                Task { await viewModel.deleteNotes(at: offsets) }
+            }
+        }
+        .listStyle(.plain)
+    }
 }
 
 private struct LectureRow: View {
     let note: LectureNote
 
-    private static let dateFormatter: DateFormatter = {
+    fileprivate static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
@@ -133,6 +166,7 @@ private struct LectureRow: View {
     return LectureListView(
         viewModel: vm,
         audioRecorder: AudioRecorderService(),
-        transcriptionService: TranscriptionService()
+        transcriptionService: TranscriptionService(),
+        summaryService: HeuristicSummaryService()
     )
 }

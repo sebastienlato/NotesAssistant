@@ -53,6 +53,8 @@ struct LectureDetailView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+            .accessibilityLabel(viewModel.isPlaying ? "Stop audio playback" : "Play audio")
+            .accessibilityHint("Plays the recorded lecture audio")
 
             Button(action: viewModel.transcribe) {
                 if viewModel.isTranscribing {
@@ -66,6 +68,8 @@ struct LectureDetailView: View {
             }
             .buttonStyle(.bordered)
             .disabled(viewModel.isTranscribing)
+            .accessibilityLabel("Transcribe recording")
+            .accessibilityHint("Converts the audio to text")
         }
     }
 
@@ -102,6 +106,7 @@ struct LectureDetailView: View {
             }
             .buttonStyle(.bordered)
             .disabled(!viewModel.canShareTranscript)
+            .accessibilityHint("Shares the transcript text")
 
             Button {
                 if let items = viewModel.audioShareItems() {
@@ -114,6 +119,7 @@ struct LectureDetailView: View {
             }
             .buttonStyle(.bordered)
             .disabled(!viewModel.canShareAudio)
+            .accessibilityHint("Shares the recorded audio file")
 
             Button {
                 Task {
@@ -133,6 +139,7 @@ struct LectureDetailView: View {
             }
             .buttonStyle(.bordered)
             .disabled(viewModel.isExportingPDF)
+            .accessibilityHint("Exports the transcript as a PDF file")
 
             studyHelpersSection
         }
@@ -148,6 +155,7 @@ struct LectureDetailView: View {
             }
             .buttonStyle(.bordered)
             .disabled(viewModel.isSummarizing || !viewModel.canGenerateSummary)
+            .accessibilityHint("Creates a quick study summary from the transcript")
 
             if viewModel.isSummarizing {
                 ProgressView("Summarizing…")
