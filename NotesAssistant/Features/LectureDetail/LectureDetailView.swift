@@ -2,9 +2,6 @@ import SwiftUI
 
 struct LectureDetailView: View {
     @StateObject private var viewModel: LectureDetailViewModel
-    @State private var shareItems: [Any] = []
-    @State private var showingShareSheet = false
-
     init(viewModel: LectureDetailViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
@@ -32,8 +29,10 @@ struct LectureDetailView: View {
         }
         .navigationTitle("Lecture Detail")
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingShareSheet) {
-            ShareSheet(activityItems: shareItems)
+        .sheet(isPresented: $viewModel.isShareSheetPresented) {
+            if let url = viewModel.shareURL {
+                ShareSheet(activityItems: [url])
+            }
         }
     }
 
@@ -96,10 +95,7 @@ struct LectureDetailView: View {
                 .font(.headline)
 
             Button {
-                if let items = viewModel.transcriptShareItems() {
-                    shareItems = items
-                    showingShareSheet = true
-                }
+                viewModel.shareTranscript()
             } label: {
                 Label("Share transcript…", systemImage: "square.and.arrow.up")
                     .frame(maxWidth: .infinity)
@@ -109,10 +105,7 @@ struct LectureDetailView: View {
             .accessibilityHint("Shares the transcript text")
 
             Button {
-                if let items = viewModel.audioShareItems() {
-                    shareItems = items
-                    showingShareSheet = true
-                }
+                viewModel.shareAudio()
             } label: {
                 Label("Share audio…", systemImage: "music.note.list")
                     .frame(maxWidth: .infinity)
@@ -122,12 +115,7 @@ struct LectureDetailView: View {
             .accessibilityHint("Shares the recorded audio file")
 
             Button {
-                Task {
-                    if let url = await viewModel.pdfShareURL() {
-                        shareItems = [url]
-                        showingShareSheet = true
-                    }
-                }
+                viewModel.sharePDF()
             } label: {
                 if viewModel.isExportingPDF {
                     ProgressView()

@@ -13,6 +13,8 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
     @Published var errorMessage: String?
     @Published var summaryResult: SummaryResult?
     @Published var summaryErrorMessage: String?
+    @Published var isShareSheetPresented = false
+    @Published var shareURL: URL?
 
     private(set) var note: LectureNote
 
@@ -74,42 +76,54 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
         scheduleAutosave()
     }
 
-    func transcriptShareItems() -> [Any]? {
+    func shareTranscript() {
         let text = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             errorMessage = "Transcript is empty."
-            return nil
+            return
         }
-        let titleLine = titleText.isEmpty ? note.title : titleText
-        let exportText = "\(titleLine)\n\n\(text)"
-        return [exportText]
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let url = try await self.makeTranscriptFileURL(text: text)
+                await self.presentShareSheet(url: url)
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Could not prepare transcript. Please try again."
+                }
+            }
+        }
     }
 
-    func audioShareItems() -> [Any]? {
-        let url = audioURL
-        guard FileManager.default.fileExists(atPath: url.path) else {
+    func shareAudio() {
+        guard canShareAudio else {
             errorMessage = "Audio file is missing."
-            return nil
+            return
         }
-        return [url]
+        let url = audioURL
+        Task { [weak self] in
+            await self?.presentShareSheet(url: url)
+        }
     }
 
-    func pdfShareURL() async -> URL? {
+    func sharePDF() {
         let text = transcriptText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             errorMessage = "Transcript is empty."
-            return nil
+            return
         }
         isExportingPDF = true
-        defer { isExportingPDF = false }
-
-        let titleLine = titleText.isEmpty ? note.title : titleText
-        do {
-            let url = try pdfExporter.exportPDF(title: titleLine, date: note.date, transcript: text)
-            return url
-        } catch {
-            errorMessage = "Could not create PDF. Please try again."
-            return nil
+        Task { [weak self] in
+            guard let self else { return }
+            let titleLine = titleText.isEmpty ? note.title : titleText
+            do {
+                let url = try self.pdfExporter.exportPDF(title: titleLine, date: self.note.date, transcript: text)
+                await self.presentShareSheet(url: url)
+            } catch {
+                await MainActor.run { self.errorMessage = "Could not create PDF. Please try again." }
+            }
+            await MainActor.run { self.isExportingPDF = false }
         }
     }
 
@@ -199,6 +213,23 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
 
     private func persistCurrentNote() async {
         await persistNote(note)
+    }
+
+    private func makeTranscriptFileURL(text: String) async throws -> URL {
+        let titleLine = titleText.isEmpty ? note.title : titleText
+        let exportText = "\(titleLine)\n\n\(text)"
+        return try await Task.detached(priority: .utility) {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("Transcript-\(UUID().uuidString).txt")
+            try exportText.write(to: url, atomically: true, encoding: .utf8)
+            return url
+        }.value
+    }
+
+    private func presentShareSheet(url: URL) async {
+        await MainActor.run { self.shareURL = url }
+        DispatchQueue.main.async { [weak self] in
+            self?.isShareSheetPresented = true
+        }
     }
 
     private static let dateFormatter: DateFormatter = {
