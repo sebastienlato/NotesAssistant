@@ -2,6 +2,7 @@ import AVFAudio
 import AVFoundation
 import Combine
 import Foundation
+import UIKit
 
 @MainActor
 final class RecordingViewModel: ObservableObject {
@@ -14,14 +15,25 @@ final class RecordingViewModel: ObservableObject {
     @Published var elapsedTime: TimeInterval = 0
     @Published var errorMessage: String?
     @Published var completedRecording: RecordedAudio?
+    @Published var micLevel: Float = 0
 
     private let audioRecorder: AudioRecording
+    private let micMonitor: MicLevelMonitoring
+    private let startHaptic: UIImpactFeedbackGenerator
+    private let stopHaptic: UIImpactFeedbackGenerator
+    private let successHaptic: UINotificationFeedbackGenerator
+    private let errorHaptic: UINotificationFeedbackGenerator
     private var timer: Timer?
     private var recordingStartDate: Date?
     private var permissionsChecked = false
 
-    init(audioRecorder: AudioRecording) {
+    init(audioRecorder: AudioRecording, micMonitor: MicLevelMonitoring) {
         self.audioRecorder = audioRecorder
+        self.micMonitor = micMonitor
+        self.startHaptic = UIImpactFeedbackGenerator(style: .medium)
+        self.stopHaptic = UIImpactFeedbackGenerator(style: .rigid)
+        self.successHaptic = UINotificationFeedbackGenerator()
+        self.errorHaptic = UINotificationFeedbackGenerator()
         Task { await restoreRecorderState() }
     }
 
@@ -42,7 +54,7 @@ final class RecordingViewModel: ObservableObject {
                 }
             }
         }
-        if isRecording, let start = recordingStartDate {
+        if isRecording, timer == nil, let start = recordingStartDate {
             startTimer(from: start)
         }
     }
@@ -61,6 +73,7 @@ final class RecordingViewModel: ObservableObject {
 
     func pauseTimerOnDisappear() {
         stopTimer()
+        stopMonitoringLevels()
     }
 
     // MARK: - Private
@@ -72,10 +85,13 @@ final class RecordingViewModel: ObservableObject {
             let startDate = Date()
             isRecording = true
             startTimer(from: startDate)
+            startMonitoringLevels()
+            startHaptic.impactOccurred(intensity: 0.7)
         } catch {
             errorMessage = error.localizedDescription
             isRecording = false
             stopTimer()
+            errorHaptic.notificationOccurred(.error)
         }
     }
 
@@ -84,13 +100,16 @@ final class RecordingViewModel: ObservableObject {
         isRecording = false
         stopTimer()
         recordingStartDate = nil
+        stopMonitoringLevels()
 
         do {
             let url = try await audioRecorder.stopRecording()
             completedRecording = RecordedAudio(fileURL: url)
             elapsedTime = 0
+            stopHaptic.impactOccurred(intensity: 1.0)
         } catch {
             errorMessage = error.localizedDescription
+            errorHaptic.notificationOccurred(.error)
         }
     }
 
@@ -154,6 +173,26 @@ final class RecordingViewModel: ObservableObject {
         await MainActor.run {
             isRecording = true
             startTimer(from: startDate)
+            startMonitoringLevels()
+            successHaptic.notificationOccurred(.success)
         }
+    }
+
+    private func startMonitoringLevels() {
+        stopMonitoringLevels()
+        micMonitor.onLevelUpdate = { [weak self] level in
+            DispatchQueue.main.async {
+                self?.micLevel = level
+            }
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            await micMonitor.startMonitoring { self.audioRecorder.recorderInstance }
+        }
+    }
+
+    private func stopMonitoringLevels() {
+        micMonitor.stopMonitoring()
+        micLevel = 0
     }
 }

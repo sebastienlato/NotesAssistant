@@ -7,6 +7,7 @@ protocol AudioRecording {
     func stopRecording() async throws -> URL
     var isRecording: Bool { get async }
     var currentStartDate: Date? { get async }
+    var recorderInstance: AVAudioRecorder? { get }
 }
 
 enum AudioRecorderError: LocalizedError {
@@ -54,6 +55,8 @@ final class AudioRecorderService: NSObject, AudioRecording {
     var isRecording: Bool { get async { recorder?.isRecording ?? false } }
 
     var currentStartDate: Date? { get async { recordingStartDate } }
+
+    var recorderInstance: AVAudioRecorder? { recorder }
 
     func startRecording() throws {
         guard !isRecordingSync else {
