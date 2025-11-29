@@ -41,6 +41,7 @@ struct RecordingView: View {
         .padding()
         .navigationTitle("Recording")
         .onAppear { viewModel.onAppear() }
+        .onDisappear { viewModel.pauseTimerOnDisappear() }
         .onChange(of: viewModel.completedRecording) { _, recording in
             guard let recording else { return }
             Task { @MainActor in

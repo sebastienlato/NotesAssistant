@@ -22,6 +22,7 @@ final class RecordingViewModel: ObservableObject {
 
     init(audioRecorder: AudioRecording) {
         self.audioRecorder = audioRecorder
+        Task { await restoreRecorderState() }
     }
 
     var elapsedTimeString: String {
@@ -32,13 +33,17 @@ final class RecordingViewModel: ObservableObject {
     }
 
     func onAppear() {
-        guard !permissionsChecked else { return }
-        permissionsChecked = true
-        Task {
-            let granted = await requestRecordPermission()
-            if !granted {
-                errorMessage = AudioRecorderError.permissionDenied.localizedDescription
+        if !permissionsChecked {
+            permissionsChecked = true
+            Task {
+                let granted = await requestRecordPermission()
+                if !granted {
+                    errorMessage = AudioRecorderError.permissionDenied.localizedDescription
+                }
             }
+        }
+        if isRecording, let start = recordingStartDate {
+            startTimer(from: start)
         }
     }
 
@@ -54,15 +59,19 @@ final class RecordingViewModel: ObservableObject {
         completedRecording = nil
     }
 
+    func pauseTimerOnDisappear() {
+        stopTimer()
+    }
+
     // MARK: - Private
 
     private func startRecording() {
         errorMessage = nil
         do {
             try audioRecorder.startRecording()
-            recordingStartDate = Date()
+            let startDate = Date()
             isRecording = true
-            startTimer()
+            startTimer(from: startDate)
         } catch {
             errorMessage = error.localizedDescription
             isRecording = false
@@ -85,9 +94,9 @@ final class RecordingViewModel: ObservableObject {
         }
     }
 
-    private func startTimer() {
-        elapsedTime = 0
-        recordingStartDate = Date()
+    private func startTimer(from startDate: Date) {
+        recordingStartDate = startDate
+        elapsedTime = Date().timeIntervalSince(startDate)
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
@@ -135,6 +144,16 @@ final class RecordingViewModel: ObservableObject {
             @unknown default:
                 return false
             }
+        }
+    }
+
+    private func restoreRecorderState() async {
+        let isActive = await audioRecorder.isRecording
+        guard isActive else { return }
+        let startDate = await audioRecorder.currentStartDate ?? Date()
+        await MainActor.run {
+            isRecording = true
+            startTimer(from: startDate)
         }
     }
 }

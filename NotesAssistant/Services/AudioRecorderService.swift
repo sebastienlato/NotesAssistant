@@ -5,7 +5,8 @@ import Foundation
 protocol AudioRecording {
     func startRecording() throws
     func stopRecording() async throws -> URL
-    var isRecording: Bool { get }
+    var isRecording: Bool { get async }
+    var currentStartDate: Date? { get async }
 }
 
 enum AudioRecorderError: LocalizedError {
@@ -36,6 +37,7 @@ final class AudioRecorderService: NSObject, AudioRecording {
     private var recorder: AVAudioRecorder?
     private var currentFileURL: URL?
     private var interruptionObserver: Any?
+    private var recordingStartDate: Date?
 
     override init() {
         self.session = AVAudioSession.sharedInstance()
@@ -49,12 +51,12 @@ final class AudioRecorderService: NSObject, AudioRecording {
         }
     }
 
-    var isRecording: Bool {
-        recorder?.isRecording ?? false
-    }
+    var isRecording: Bool { get async { recorder?.isRecording ?? false } }
+
+    var currentStartDate: Date? { get async { recordingStartDate } }
 
     func startRecording() throws {
-        guard !isRecording else {
+        guard !isRecordingSync else {
             throw AudioRecorderError.alreadyRecording
         }
 
@@ -83,6 +85,7 @@ final class AudioRecorderService: NSObject, AudioRecording {
             recorder.record()
             self.recorder = recorder
             self.currentFileURL = fileURL
+            self.recordingStartDate = Date()
         } catch {
             throw AudioRecorderError.failedToStart
         }
@@ -95,6 +98,7 @@ final class AudioRecorderService: NSObject, AudioRecording {
 
         recorder.stop()
         self.recorder = nil
+        recordingStartDate = nil
 
         do {
             try session.setActive(false, options: .notifyOthersOnDeactivation)
@@ -147,6 +151,7 @@ final class AudioRecorderService: NSObject, AudioRecording {
     private func handleInterruptionBegan() {
         recorder?.stop()
         recorder = nil
+        recordingStartDate = nil
     }
 
     private func hasRecordPermission() -> Bool {
@@ -156,11 +161,16 @@ final class AudioRecorderService: NSObject, AudioRecording {
             return session.recordPermission == .granted
         }
     }
+
+    private var isRecordingSync: Bool {
+        recorder?.isRecording ?? false
+    }
 }
 
 extension AudioRecorderService: AVAudioRecorderDelegate {
     func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
         self.recorder?.stop()
         currentFileURL = nil
+        recordingStartDate = nil
     }
 }
