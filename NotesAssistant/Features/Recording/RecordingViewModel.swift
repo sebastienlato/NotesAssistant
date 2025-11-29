@@ -5,7 +5,7 @@ import Foundation
 
 @MainActor
 final class RecordingViewModel: ObservableObject {
-    struct RecordedAudio: Identifiable, Hashable {
+    struct RecordedAudio: Identifiable, Hashable, Sendable {
         let id = UUID()
         let fileURL: URL
     }
