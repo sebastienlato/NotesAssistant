@@ -9,20 +9,25 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
     @Published var isPlaying = false
     @Published var isTranscribing = false
     @Published var isExportingPDF = false
+    @Published var isSummarizing = false
     @Published var errorMessage: String?
+    @Published var summaryResult: SummaryResult?
+    @Published var summaryErrorMessage: String?
 
     private(set) var note: LectureNote
 
     private let transcriptionService: Transcribing
+    private let summaryService: any Summarizing
     private let persistNote: @Sendable (LectureNote) async -> Void
     private let pdfExporter: PDFExporting
     private let documentsDirectory: URL
     private var audioPlayer: AVAudioPlayer?
     private var autosaveTask: Task<Void, Never>?
 
-    init(note: LectureNote, transcriptionService: Transcribing, pdfExporter: PDFExporting, persistNote: @escaping @Sendable (LectureNote) async -> Void) {
+    init(note: LectureNote, transcriptionService: Transcribing, summaryService: any Summarizing, pdfExporter: PDFExporting, persistNote: @escaping @Sendable (LectureNote) async -> Void) {
         self.note = note
         self.transcriptionService = transcriptionService
+        self.summaryService = summaryService
         self.persistNote = persistNote
         self.pdfExporter = pdfExporter
         self.documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
@@ -52,6 +57,10 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
         FileManager.default.fileExists(atPath: audioURL.path)
     }
 
+    var canGenerateSummary: Bool {
+        !(note.transcriptText ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     func updateTitle(_ text: String) {
         titleText = text
         note.title = text
@@ -61,6 +70,7 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
     func updateTranscript(_ text: String) {
         transcriptText = text
         note.transcriptText = text.isEmpty ? nil : text
+        summaryResult = nil
         scheduleAutosave()
     }
 
@@ -100,6 +110,33 @@ final class LectureDetailViewModel: NSObject, ObservableObject {
         } catch {
             errorMessage = "Failed to create PDF: \(error.localizedDescription)"
             return nil
+        }
+    }
+
+    func generateSummary() {
+        guard canGenerateSummary else {
+            summaryErrorMessage = "You need a transcript before generating a summary."
+            return
+        }
+
+        isSummarizing = true
+        summaryErrorMessage = nil
+
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let transcript = note.transcriptText ?? ""
+                let result = try await summaryService.summarize(text: transcript)
+                await MainActor.run {
+                    self.summaryResult = result
+                    self.isSummarizing = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.summaryErrorMessage = error.localizedDescription
+                    self.isSummarizing = false
+                }
+            }
         }
     }
 

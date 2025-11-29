@@ -133,6 +133,56 @@ struct LectureDetailView: View {
             }
             .buttonStyle(.bordered)
             .disabled(viewModel.isExportingPDF)
+
+            studyHelpersSection
+        }
+    }
+
+    private var studyHelpersSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Study helpers")
+                .font(.headline)
+
+            Button("Generate summary & key points") {
+                viewModel.generateSummary()
+            }
+            .buttonStyle(.bordered)
+            .disabled(viewModel.isSummarizing || !viewModel.canGenerateSummary)
+
+            if viewModel.isSummarizing {
+                ProgressView("Summarizing…")
+            }
+
+            if let result = viewModel.summaryResult {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Summary")
+                        .font(.headline)
+                    Text(result.summary)
+                        .font(.body)
+
+                    if !result.keyPoints.isEmpty {
+                        Text("Key points")
+                            .font(.headline)
+                            .padding(.top, 4)
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(result.keyPoints, id: \.self) { point in
+                                HStack(alignment: .top, spacing: 6) {
+                                    Text("•")
+                                    Text(point)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 8)
+            }
+
+            if let error = viewModel.summaryErrorMessage {
+                Text(error)
+                    .foregroundStyle(.red)
+                    .font(.footnote)
+            }
         }
     }
 }
@@ -151,6 +201,7 @@ struct LectureDetailView: View {
             viewModel: LectureDetailViewModel(
                 note: sampleNote,
                 transcriptionService: transcription,
+                summaryService: HeuristicSummaryService(),
                 pdfExporter: PDFExporter(),
                 persistNote: { _ in }
             )
