@@ -251,24 +251,24 @@ private extension LectureListView {
 
     @ViewBuilder
     func lectureRow(for note: LectureNote) -> some View {
-        NavigationLink {
-            detailView(for: note)
-        } label: {
-            LectureCard(note: note)
-                .accessibilityLabel("Lecture titled \(note.title), recorded on \(LectureCard.dateFormatter.string(from: note.date))")
-        }
-        .buttonStyle(.plain)
-        .listRowBackground(Color.clear)
-        .listRowInsets(EdgeInsets())
-        .listRowSeparator(.hidden)
-        .padding(.vertical, 6)
-        .swipeActions {
-            Button(role: .destructive) {
-                viewModel.deleteLecture(note)
-            } label: {
-                Label("Delete", systemImage: "trash")
+        LectureCard(note: note)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                path.append(.detail(note))
             }
-        }
+            .accessibilityLabel("Lecture titled \(note.title), recorded on \(LectureCard.dateFormatter.string(from: note.date))")
+            .accessibilityAddTraits(.isButton)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .padding(.vertical, 6)
+            .swipeActions {
+                Button(role: .destructive) {
+                    viewModel.deleteLecture(note)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
     }
 }
 
