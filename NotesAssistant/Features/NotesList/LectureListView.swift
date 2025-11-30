@@ -36,13 +36,6 @@ struct LectureListView: View {
                     }
 
                     Section {
-                        filterCard
-                            .listRowBackground(Color.clear)
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                    }
-
-                    Section {
                         if viewModel.notes.isEmpty {
                             emptyState
                                 .listRowBackground(Color.clear)
@@ -72,6 +65,7 @@ struct LectureListView: View {
                 .listSectionSeparator(.hidden)
                 .scrollContentBackground(.hidden)
                 .scrollIndicators(.hidden)
+                .safeAreaPadding(.bottom, 80)
             }
             .navigationDestination(for: LectureRoute.self) { route in
                 switch route {
@@ -104,6 +98,17 @@ struct LectureListView: View {
         .navigationTitle("Lecture Notes")
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    Haptics.impact(.light)
+                    viewModel.showOnlyWithTranscript.toggle()
+                } label: {
+                    Image(systemName: viewModel.showOnlyWithTranscript ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .font(.system(size: 20, weight: .semibold))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(viewModel.showOnlyWithTranscript ? "Show all notes" : "Only notes with transcript")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     Haptics.impact(.medium)
@@ -116,30 +121,9 @@ struct LectureListView: View {
                 .accessibilityLabel("New Recording")
             }
         }
-        .searchable(text: $viewModel.searchText, prompt: "Search titles")
-    }
-
-    private var filterCard: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Filter")
-                    .font(.subheadline.weight(.semibold))
-                Text("Only notes with transcript")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Toggle("", isOn: $viewModel.showOnlyWithTranscript)
-                .labelsHidden()
+        .overlay(alignment: .bottom) {
+            searchBarOverlay
         }
-        .padding()
-        .background(.ultraThinMaterial)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(AppColors.cardBorder, lineWidth: 1)
-        )
-        .cornerRadius(16)
-        .padding(.horizontal)
     }
 
     private var emptyState: some View {
@@ -177,6 +161,26 @@ struct LectureListView: View {
             .font(.subheadline)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var searchBarOverlay: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search titles", text: $viewModel.searchText)
+                .disableAutocorrection(true)
+                .textInputAutocapitalization(.never)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .overlay(
+            RoundedRectangle(cornerRadius: 999)
+                .stroke(AppColors.cardBorder, lineWidth: 1)
+        )
+        .cornerRadius(999)
+        .padding(.horizontal)
+        .padding(.bottom, 12)
     }
 }
 
