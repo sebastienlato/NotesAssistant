@@ -1,6 +1,6 @@
 # NotesAssistant
 
-![NotesAssistant icon](NotesAssistant/Assets.xcassets/AppIcon.appiconset/AppIcon.png)
+<img src="NotesAssistant/Assets.xcassets/AppIcon.appiconset/AppIcon.png" alt="NotesAssistant icon" width="96" height="96">
 
 NotesAssistant captures lectures, applies noise reduction, transcribes audio, and provides study helpers like summaries and key points.
 
