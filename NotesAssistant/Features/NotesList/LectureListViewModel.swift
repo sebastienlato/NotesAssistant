@@ -85,6 +85,20 @@ final class LectureListViewModel: ObservableObject {
         }
     }
 
+    func deleteLecture(_ note: LectureNote) {
+        removeAudioFile(for: note)
+        notes.removeAll { $0.id == note.id }
+        Task {
+            do {
+                try await persistNotes()
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "Could not delete note. Please try again."
+                }
+            }
+        }
+    }
+
     var filteredNotes: [LectureNote] {
         var filtered = notes
         if !searchText.trimmingCharacters(in: .whitespaces).isEmpty {

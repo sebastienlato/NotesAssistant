@@ -26,39 +26,52 @@ struct LectureListView: View {
                 LinearGradient(colors: [AppColors.primaryBlue.opacity(0.9), Color.black], startPoint: .top, endPoint: .bottom)
                     .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                // Use List here (instead of ScrollView) to get native swipe-to-delete while still styling rows as cards.
+                List {
+                    Section {
                         tagline
-                            .padding(.top, 4)
+                            .padding(.vertical, 4)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    }
 
+                    Section {
                         filterCard
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                    }
 
+                    Section {
                         if viewModel.notes.isEmpty {
                             emptyState
+                                .listRowBackground(Color.clear)
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
                         } else if viewModel.filteredNotes.isEmpty {
                             noResultsState
+                                .listRowBackground(Color.clear)
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
                         } else {
-                            LazyVStack(spacing: 12) {
-                                ForEach(viewModel.filteredNotes) { note in
-                                    NavigationLink(value: LectureRoute.detail(note)) {
-                                        LectureCard(note: note)
-                                            .accessibilityLabel("Lecture titled \(note.title), recorded on \(LectureCard.dateFormatter.string(from: note.date))")
-                                    }
-                                    .buttonStyle(.plain)
-                                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                                }
-                                .onDelete { offsets in
-                                    Task { await viewModel.deleteNotes(at: offsets) }
-                                }
+                            ForEach(viewModel.filteredNotes) { note in
+                                lectureRow(for: note)
                             }
-                            .animation(.easeInOut(duration: 0.25), value: viewModel.filteredNotes)
                         }
-
-                        Spacer(minLength: 80)
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 32)
+
+                    Section {
+                        Spacer(minLength: 80)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                    }
                 }
+                .listStyle(.plain)
+                .listRowSeparator(.hidden)
+                .listSectionSeparator(.hidden)
+                .scrollContentBackground(.hidden)
+                .scrollIndicators(.hidden)
             }
             .navigationDestination(for: LectureRoute.self) { route in
                 switch route {
@@ -217,6 +230,45 @@ private struct LectureCard: View {
         )
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.1), radius: 12, x: 0, y: 8)
+    }
+}
+
+private extension LectureListView {
+    @ViewBuilder
+    func detailView(for note: LectureNote) -> some View {
+        LectureDetailView(
+            viewModel: LectureDetailViewModel(
+                note: note,
+                transcriptionService: transcriptionService,
+                summaryService: summaryService,
+                pdfExporter: PDFExporter(),
+                persistNote: { updated in
+                    await viewModel.persist(note: updated)
+                }
+            )
+        )
+    }
+
+    @ViewBuilder
+    func lectureRow(for note: LectureNote) -> some View {
+        NavigationLink {
+            detailView(for: note)
+        } label: {
+            LectureCard(note: note)
+                .accessibilityLabel("Lecture titled \(note.title), recorded on \(LectureCard.dateFormatter.string(from: note.date))")
+        }
+        .buttonStyle(.plain)
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .padding(.vertical, 6)
+        .swipeActions {
+            Button(role: .destructive) {
+                viewModel.deleteLecture(note)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
 }
 
