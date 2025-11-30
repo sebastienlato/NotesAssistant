@@ -151,8 +151,6 @@ struct LectureDetailView: View {
             .buttonStyle(.bordered)
             .disabled(viewModel.isExportingPDF)
             .accessibilityHint("Exports the transcript as a PDF file")
-
-            studyHelpersSection
         }
         .padding()
         .background(AppColors.cardBackground)
