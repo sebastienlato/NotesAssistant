@@ -19,10 +19,7 @@ final class RecordingViewModel: ObservableObject {
 
     private let audioRecorder: AudioRecording
     private let micMonitor: MicLevelMonitoring
-    private let startHaptic: UIImpactFeedbackGenerator
-    private let stopHaptic: UIImpactFeedbackGenerator
-    private let successHaptic: UINotificationFeedbackGenerator
-    private let errorHaptic: UINotificationFeedbackGenerator
+    private let emaSmoothing: Float = 0.2
     private var timer: Timer?
     private var recordingStartDate: Date?
     private var permissionsChecked = false
@@ -30,10 +27,6 @@ final class RecordingViewModel: ObservableObject {
     init(audioRecorder: AudioRecording, micMonitor: MicLevelMonitoring) {
         self.audioRecorder = audioRecorder
         self.micMonitor = micMonitor
-        self.startHaptic = UIImpactFeedbackGenerator(style: .medium)
-        self.stopHaptic = UIImpactFeedbackGenerator(style: .rigid)
-        self.successHaptic = UINotificationFeedbackGenerator()
-        self.errorHaptic = UINotificationFeedbackGenerator()
         Task { await restoreRecorderState() }
     }
 
@@ -86,12 +79,12 @@ final class RecordingViewModel: ObservableObject {
             isRecording = true
             startTimer(from: startDate)
             startMonitoringLevels()
-            startHaptic.impactOccurred(intensity: 0.7)
+            Haptics.impact(.medium, intensity: 0.8)
         } catch {
             errorMessage = error.localizedDescription
             isRecording = false
             stopTimer()
-            errorHaptic.notificationOccurred(.error)
+            Haptics.notification(.error)
         }
     }
 
@@ -106,10 +99,10 @@ final class RecordingViewModel: ObservableObject {
             let url = try await audioRecorder.stopRecording()
             completedRecording = RecordedAudio(fileURL: url)
             elapsedTime = 0
-            stopHaptic.impactOccurred(intensity: 1.0)
+            Haptics.impact(.rigid, intensity: 1.0)
         } catch {
             errorMessage = error.localizedDescription
-            errorHaptic.notificationOccurred(.error)
+            Haptics.notification(.error)
         }
     }
 
@@ -174,7 +167,7 @@ final class RecordingViewModel: ObservableObject {
             isRecording = true
             startTimer(from: startDate)
             startMonitoringLevels()
-            successHaptic.notificationOccurred(.success)
+            Haptics.notification(.success)
         }
     }
 
@@ -182,7 +175,9 @@ final class RecordingViewModel: ObservableObject {
         stopMonitoringLevels()
         micMonitor.onLevelUpdate = { [weak self] level in
             DispatchQueue.main.async {
-                self?.micLevel = level
+                guard let self else { return }
+                let smoothed = self.micLevel * (1 - self.emaSmoothing) + level * self.emaSmoothing
+                self.micLevel = smoothed
             }
         }
         Task { [weak self] in

@@ -9,12 +9,15 @@ struct NotesAssistantApp: App {
 
     var body: some Scene {
         WindowGroup {
-            LectureListView(
-                viewModel: LectureListViewModel(lectureStore: lectureStore),
-                audioRecorder: audioRecorder,
-                transcriptionService: transcriptionService,
-                summaryService: summaryService
-            )
+            NavigationStack {
+                LectureListView(
+                    viewModel: LectureListViewModel(lectureStore: lectureStore),
+                    audioRecorder: audioRecorder,
+                    transcriptionService: transcriptionService,
+                    summaryService: summaryService
+                )
+                .accentColor(AppColors.accentBlue)
+            }
         }
     }
 }

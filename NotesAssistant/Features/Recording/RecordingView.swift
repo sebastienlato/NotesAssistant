@@ -1,9 +1,11 @@
 import SwiftUI
 
 struct RecordingView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var lectureListViewModel: LectureListViewModel
     @StateObject private var viewModel: RecordingViewModel
     private let onNoteCreated: (LectureNote) -> Void
+    @State private var noiseReduction = false
 
     init(audioRecorder: AudioRecording, lectureListViewModel: LectureListViewModel, onNoteCreated: @escaping (LectureNote) -> Void) {
         self._viewModel = StateObject(wrappedValue: RecordingViewModel(audioRecorder: audioRecorder, micMonitor: MicLevelMonitor()))
@@ -13,27 +15,30 @@ struct RecordingView: View {
 
 var body: some View {
         ZStack {
-            LinearGradient(colors: [.black.opacity(0.9), .gray.opacity(0.2)], startPoint: .top, endPoint: .bottom)
+            LinearGradient(colors: [.black, AppColors.primaryBlue], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
             VStack(spacing: 24) {
-                RecordingHeader()
-                    .padding(.top, 16)
+                header
+                    .padding(.top, 12)
 
-                WaveformView(level: CGFloat(viewModel.micLevel))
-                    .frame(height: 220)
+                WaveformView(level: CGFloat(max(viewModel.micLevel, 0.05)))
+                    .frame(height: 200)
                     .padding(.horizontal, 24)
 
                 Text(viewModel.elapsedTimeString)
-                    .font(.system(size: 48, weight: .medium, design: .rounded))
+                    .font(.system(size: 52, weight: .medium, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(.white)
 
-                HStack(spacing: 4) {
-                    ForEach(0..<12, id: \.self) { index in
-                        MicLevelBar(level: CGFloat(viewModel.micLevel) * CGFloat.random(in: 0.6...1.2))
+                controlRow
+                    .padding(.horizontal, 24)
+
+                HStack(spacing: 6) {
+                    ForEach(0..<12, id: \.self) { _ in
+                        MicLevelBar(level: CGFloat(max(viewModel.micLevel, 0.05)))
                     }
                 }
-                .frame(height: 40)
+                .frame(height: 48)
                 .padding(.horizontal, 36)
 
                 Spacer()
@@ -46,8 +51,9 @@ var body: some View {
             }
             .padding(.horizontal)
         }
-        .navigationTitle("Recording")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear { viewModel.onAppear() }
         .onDisappear { viewModel.pauseTimerOnDisappear() }
         .onChange(of: viewModel.completedRecording) { _, recording in
@@ -66,6 +72,67 @@ var body: some View {
                     .background(.thinMaterial)
             }
         }
+    }
+
+    private var header: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Button {
+                    dismiss()
+                } label: {
+                    Circle()
+                        .fill(Color.white.opacity(0.15))
+                        .frame(width: 36, height: 36)
+                        .overlay(
+                            Image(systemName: "chevron.left")
+                                .foregroundStyle(.white)
+                        )
+                }
+                Spacer()
+                VStack(spacing: 4) {
+                    Text("Recording")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(viewModel.isRecording ? Color.red : Color.gray)
+                            .frame(width: 8, height: 8)
+                        Text(viewModel.isRecording ? "Recording" : "Ready")
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.8))
+                    }
+                }
+                Spacer()
+                // spacer to balance layout
+                Circle()
+                    .fill(Color.clear)
+                    .frame(width: 36, height: 36)
+            }
+        }
+    }
+
+    private var controlRow: some View {
+        HStack {
+            HStack(spacing: 6) {
+                Image(systemName: "wind")
+                    .foregroundStyle(.white.opacity(0.8))
+                Text("Noise reduction")
+                    .foregroundStyle(.white)
+                Image(systemName: "info.circle")
+                    .font(.footnote)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+            Spacer()
+            Toggle("", isOn: $noiseReduction)
+                .labelsHidden()
+        }
+        .padding()
+        .background(AppColors.cardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(AppColors.cardBorder, lineWidth: 1)
+        )
+        .cornerRadius(14)
     }
 
     @MainActor

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct LectureDetailView: View {
     @StateObject private var viewModel: LectureDetailViewModel
+    @State private var selectedSection: DetailSection = .transcript
+
     init(viewModel: LectureDetailViewModel) {
         _viewModel = StateObject(wrappedValue: viewModel)
     }
@@ -11,13 +13,17 @@ struct LectureDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 titleField
                 Text(viewModel.formattedDate)
-                    .font(.subheadline)
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
 
-                playbackButtons
+                Picker("Section", selection: $selectedSection) {
+                    ForEach(DetailSection.allCases) { section in
+                        Text(section.title).tag(section)
+                    }
+                }
+                .pickerStyle(.segmented)
 
-                transcriptSection
-                exportSection
+                sectionContent
 
                 if let error = viewModel.errorMessage {
                     Text(error)
@@ -41,8 +47,14 @@ struct LectureDetailView: View {
             get: { viewModel.titleText },
             set: { viewModel.updateTitle($0) }
         ))
-        .font(.title2.weight(.semibold))
-        .textFieldStyle(.roundedBorder)
+        .font(.title3.weight(.semibold))
+        .padding(10)
+        .background(AppColors.cardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(AppColors.cardBorder, lineWidth: 1)
+        )
+        .cornerRadius(10)
     }
 
     private var playbackButtons: some View {
@@ -73,19 +85,30 @@ struct LectureDetailView: View {
     }
 
     private var transcriptSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Transcript")
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 12) {
+            playbackButtons
 
-            TextEditor(text: Binding(
-                get: { viewModel.transcriptText },
-                set: { viewModel.updateTranscript($0) }
-            ))
-            .frame(minHeight: 240)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.gray.opacity(0.3))
-            )
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Transcript")
+                    .font(.headline)
+                TextEditor(text: Binding(
+                    get: { viewModel.transcriptText },
+                    set: { viewModel.updateTranscript($0) }
+                ))
+                .frame(minHeight: 240)
+                .padding(8)
+                .background(AppColors.cardBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(AppColors.cardBorder, lineWidth: 1)
+                )
+                .cornerRadius(10)
+                if viewModel.summaryResult != nil {
+                    Text("Summary available in Study tab.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
     }
 
@@ -131,6 +154,13 @@ struct LectureDetailView: View {
 
             studyHelpersSection
         }
+        .padding()
+        .background(AppColors.cardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppColors.cardBorder, lineWidth: 1)
+        )
+        .cornerRadius(12)
     }
 
     private var studyHelpersSection: some View {
@@ -179,6 +209,25 @@ struct LectureDetailView: View {
                     .foregroundStyle(.red)
                     .font(.footnote)
             }
+        }
+        .padding()
+        .background(AppColors.cardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppColors.cardBorder, lineWidth: 1)
+        )
+        .cornerRadius(12)
+    }
+
+    @ViewBuilder
+    private var sectionContent: some View {
+        switch selectedSection {
+        case .transcript:
+            transcriptSection
+        case .study:
+            studyHelpersSection
+        case .export:
+            exportSection
         }
     }
 }
