@@ -18,6 +18,7 @@ struct NotesAssistantApp: App {
                 )
                 .accentColor(AppColors.accentBlue)
             }
+            .statusBar(hidden: true)
         }
     }
 }
