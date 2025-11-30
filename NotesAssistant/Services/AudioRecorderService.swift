@@ -3,7 +3,7 @@ import AVFoundation
 import Foundation
 
 protocol AudioRecording {
-    func startRecording() throws
+    func startRecording(useNoiseReduction: Bool) async throws
     func stopRecording() async throws -> URL
     var isRecording: Bool { get async }
     var currentStartDate: Date? { get async }
@@ -58,7 +58,7 @@ final class AudioRecorderService: NSObject, AudioRecording {
 
     var recorderInstance: AVAudioRecorder? { recorder }
 
-    func startRecording() throws {
+    func startRecording(useNoiseReduction: Bool) async throws {
         guard !isRecordingSync else {
             throw AudioRecorderError.alreadyRecording
         }
@@ -68,15 +68,16 @@ final class AudioRecorderService: NSObject, AudioRecording {
         }
 
         do {
-            try configureSession()
+            try configureSession(useNoiseReduction: useNoiseReduction)
         } catch {
             throw AudioRecorderError.failedToConfigureSession
         }
 
         let fileURL = makeRecordingURL()
+        let sampleRate = session.sampleRate > 0 ? session.sampleRate : 44_100
         let settings: [String: Any] = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 44_100,
+            AVSampleRateKey: sampleRate,
             AVNumberOfChannelsKey: 1,
             AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
         ]
@@ -85,7 +86,9 @@ final class AudioRecorderService: NSObject, AudioRecording {
             let recorder = try AVAudioRecorder(url: fileURL, settings: settings)
             recorder.delegate = self
             recorder.isMeteringEnabled = true
-            recorder.record()
+            guard recorder.record() else {
+                throw AudioRecorderError.failedToStart
+            }
             self.recorder = recorder
             self.currentFileURL = fileURL
             self.recordingStartDate = Date()
@@ -119,9 +122,22 @@ final class AudioRecorderService: NSObject, AudioRecording {
 
     // MARK: - Helpers
 
-    private func configureSession() throws {
-        try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker])
+    private func configureSession(useNoiseReduction: Bool) throws {
+        try setNoiseReduction(useNoiseReduction)
         try session.setActive(true, options: .notifyOthersOnDeactivation)
+    }
+
+    func setNoiseReduction(_ enabled: Bool) throws {
+        do {
+            try session.setCategory(
+                .playAndRecord,
+                mode: enabled ? .voiceChat : .spokenAudio,
+                options: [.defaultToSpeaker, .allowBluetoothHFP]
+            )
+        } catch {
+            print("Error setting noise reduction: \(error)")
+            throw error
+        }
     }
 
     private func makeRecordingURL() -> URL {

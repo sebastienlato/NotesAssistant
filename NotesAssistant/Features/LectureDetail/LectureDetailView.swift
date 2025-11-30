@@ -161,15 +161,34 @@ struct LectureDetailView: View {
         .cornerRadius(12)
     }
 
-    private var studyHelpersSection: some View {
+    private var studyHelpersCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Study helpers")
                 .font(.headline)
 
-            Button("Generate summary & key points") {
-                viewModel.generateSummary()
+            Button {
+                Task {
+                    await MainActor.run {
+                        viewModel.generateSummary()
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Generate summary & key points")
+                        .font(.headline)
+                        .foregroundStyle(AppColors.accentBlue)
+                    Spacer()
+                }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(AppColors.cardBorder, lineWidth: 1)
+                )
+                .cornerRadius(20)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.plain)
             .disabled(viewModel.isSummarizing || !viewModel.canGenerateSummary)
             .accessibilityHint("Creates a quick study summary from the transcript")
 
@@ -209,7 +228,7 @@ struct LectureDetailView: View {
             }
         }
         .padding()
-        .background(AppColors.cardBackground)
+        .background(.ultraThinMaterial)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(AppColors.cardBorder, lineWidth: 1)
@@ -223,7 +242,7 @@ struct LectureDetailView: View {
         case .transcript:
             transcriptSection
         case .study:
-            studyHelpersSection
+            studyHelpersCard
         case .export:
             exportSection
         }

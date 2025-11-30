@@ -5,7 +5,6 @@ struct RecordingView: View {
     @ObservedObject private var lectureListViewModel: LectureListViewModel
     @StateObject private var viewModel: RecordingViewModel
     private let onNoteCreated: (LectureNote) -> Void
-    @State private var noiseReduction = false
 
     init(audioRecorder: AudioRecording, lectureListViewModel: LectureListViewModel, onNoteCreated: @escaping (LectureNote) -> Void) {
         self._viewModel = StateObject(wrappedValue: RecordingViewModel(audioRecorder: audioRecorder, micMonitor: MicLevelMonitor()))
@@ -13,7 +12,7 @@ struct RecordingView: View {
         self.onNoteCreated = onNoteCreated
     }
 
-var body: some View {
+    var body: some View {
         ZStack {
             LinearGradient(colors: [.black, AppColors.primaryBlue], startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
@@ -123,7 +122,7 @@ var body: some View {
                     .foregroundStyle(.white.opacity(0.7))
             }
             Spacer()
-            Toggle("", isOn: $noiseReduction)
+            Toggle("", isOn: $viewModel.noiseReductionEnabled)
                 .labelsHidden()
         }
         .padding()

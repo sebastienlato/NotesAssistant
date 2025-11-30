@@ -16,6 +16,7 @@ final class RecordingViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var completedRecording: RecordedAudio?
     @Published var micLevel: Float = 0
+    @Published var noiseReductionEnabled = true
 
     private let audioRecorder: AudioRecording
     private let micMonitor: MicLevelMonitoring
@@ -73,18 +74,21 @@ final class RecordingViewModel: ObservableObject {
 
     private func startRecording() {
         errorMessage = nil
-        do {
-            try audioRecorder.startRecording()
-            let startDate = Date()
-            isRecording = true
-            startTimer(from: startDate)
-            startMonitoringLevels()
-            Haptics.impact(.medium, intensity: 0.8)
-        } catch {
-            errorMessage = error.localizedDescription
-            isRecording = false
-            stopTimer()
-            Haptics.notification(.error)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                try await self.audioRecorder.startRecording(useNoiseReduction: self.noiseReductionEnabled)
+                let startDate = Date()
+                self.isRecording = true
+                self.startTimer(from: startDate)
+                self.startMonitoringLevels()
+                Haptics.impact(.medium, intensity: 0.8)
+            } catch {
+                self.errorMessage = error.localizedDescription
+                self.isRecording = false
+                self.stopTimer()
+                Haptics.notification(.error)
+            }
         }
     }
 
